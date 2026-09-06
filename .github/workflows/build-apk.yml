@@ -16,21 +16,47 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.7'
 
       - name: Extract Shine source
         run: |
-          mkdir project
-          unzip -q Shine_Android_GitHub.zip -d project
+          rm -rf project
+          mkdir -p project
+          unzip -o Shine_Android_GitHub.zip -d project
+
+      - name: Fix AndroidX configuration
+        working-directory: project
+        run: |
+          printf '%s\n' \
+            'android.useAndroidX=true' \
+            'android.enableJetifier=true' \
+            'org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' \
+            > gradle.properties
+
+      - name: Check project
+        working-directory: project
+        run: |
+          echo "===== PROJECT ====="
+          find . -maxdepth 3 -type f | sort
 
       - name: Build APK
         working-directory: project
-        run: gradle :app:assembleDebug
+        run: |
+          gradle :app:assembleDebug --stacktrace
+
+      - name: Check APK
+        run: |
+          ls -lh project/app/build/outputs/apk/debug/
+          test -f project/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Shine-APK
           path: project/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
